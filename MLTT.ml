@@ -1,7 +1,8 @@
 open Format
 
-
-(* Terms *)
+(****************************************************************)
+(* Terms                                                        *)
+(****************************************************************)
 type 'a tm = Var of 'a
            (* Empty type *)
            | Empty
@@ -35,7 +36,40 @@ type 'a tm = Var of 'a
            (* Universe *)
            | Type
 
+(****************************************************************)
+(* Normal/Neutral terms                                         *)
+(****************************************************************)
+type 'a nf = Lam_ of ('a -> 'a nf)
+           | Neu_ of ('a ne)
+and 'a ne = App_ of ('a ne) * ('a nf)
+          | Var_ of 'a
+          | Z_
+          | S_ of ('a nf)
+          | NatRec_ of ('a nf) * ('a nf) * ('a nf)
+          | Sup_ of ('a nf) * ('a nf)
+          | WRec_ of ('a nf) * ('a nf) * ('a nf)
+          | Nat_
+          | Pi_ of ('a nf) * ('a -> 'a nf)
+          | W_ of ('a nf) * ('a -> 'a nf)
+          | Sigma_ of ('a nf) * ('a -> 'a nf)
+          | Type_
+          | Empty_
+          | EmptyElim_ of ('a nf)
+          | Unit_
+          | Star_
+          | Bool_
+          | True_
+          | False_
+          | BoolElim_ of ('a nf) * ('a nf) * ('a nf) * ('a nf)
+          | DPair_ of ('a nf) * ('a nf)
+          | P1_ of ('a nf)
+          | P2_ of ('a nf)
 
+
+
+(****************************************************************)
+(* Pretty printing                                              *)
+(****************************************************************)
 let rec pp_tm gensym pp_a ppf (t : 'a tm) =
   let pp_tm = (pp_tm gensym pp_a) in
   match t with
@@ -69,34 +103,50 @@ let rec pp_tm gensym pp_a ppf (t : 'a tm) =
   | P2(s) -> fprintf ppf "(π₂ %a)" pp_tm s
 
 
-(* Normal/Neutral terms *)
-type 'a nf = Lam_ of ('a -> 'a nf)
-           | Neu_ of ('a ne)
-and 'a ne = App_ of ('a ne) * ('a nf)
-          | Var_ of 'a
-          | Z_
-          | S_ of ('a nf)
-          | NatRec_ of ('a nf) * ('a nf) * ('a nf)
-          | Sup_ of ('a nf) * ('a nf)
-          | WRec_ of ('a nf) * ('a nf) * ('a nf)
-          | Nat_
-          | Pi_ of ('a nf) * ('a -> 'a nf)
-          | W_ of ('a nf) * ('a -> 'a nf)
-          | Sigma_ of ('a nf) * ('a -> 'a nf)
-          | Type_
-          | Empty_
-          | EmptyElim_ of ('a nf)
-          | Unit_
-          | Star_
-          | Bool_
-          | True_
-          | False_
-          | BoolElim_ of ('a nf) * ('a nf) * ('a nf) * ('a nf)
-          | DPair_ of ('a nf) * ('a nf)
-          | P1_ of ('a nf)
-          | P2_ of ('a nf)
+(* Inject normal terms to terms *)
+let rec nf_tm (t : 'a nf) : 'a tm =
+  match t with
+  | Lam_ f -> Lam (fun x -> nf_tm (f x))
+  | Neu_ n -> ne_tm n
+and ne_tm (t : 'a ne) : 'a tm =
+  match t with
+  | App_ (t,u) -> App (ne_tm t, nf_tm u)
+  | Var_ x -> Var x
+  | Z_ -> Z
+  | S_ u -> S (nf_tm u)
+  | NatRec_ (a,z,s) -> NatRec (nf_tm a,nf_tm z, nf_tm s)
+  | Sup_(x,s) -> Sup(nf_tm x, nf_tm s)
+  | WRec_ (w,c,lim) -> WRec (nf_tm w, nf_tm c, nf_tm lim)
+  | Nat_ -> Nat
+  | Pi_(a,fam) -> Pi(nf_tm a, fun x -> nf_tm (fam x))
+  | W_(a,fam) -> W(nf_tm a, fun x -> nf_tm (fam x))
+  | Sigma_(a,fam) -> Sigma(nf_tm a, fun x -> nf_tm (fam x))
+  | Type_ -> Type
+  | Empty_ -> Empty
+  | EmptyElim_(a) -> EmptyElim(nf_tm a)
+  | Unit_ -> Unit
+  | Star_ -> Star
+  | Bool_ -> Bool
+  | True_ -> True
+  | False_ -> False
+  | BoolElim_(a,b,s,t) -> BoolElim(nf_tm a, nf_tm b, nf_tm s, nf_tm t)
+  | DPair_(s,t) -> DPair(nf_tm s, nf_tm t)
+  | P1_(s) -> P1(nf_tm s)
+  | P2_(s) -> P2(nf_tm s)
 
-(* Values *)
+let gensym : unit -> string =
+  (let x = ref 0 in
+   fun () ->
+   incr x ;
+   "x" ^ string_of_int !x)
+
+let pp_var ppf s = Format.fprintf ppf "%s" s
+
+let pp_tm_str = pp_tm gensym pp_var
+
+(****************************************************************)
+(* Values                                                       *)
+(****************************************************************)
 type 'a vl = PiD of ('a vl) * ('a vl -> 'a vl)
            | WD of ('a vl) * ('a vl -> 'a vl)
            | SigmaD of ('a vl) * ('a vl -> 'a vl)
@@ -113,10 +163,9 @@ type 'a vl = PiD of ('a vl) * ('a vl -> 'a vl)
            | ZD
            | SD of ('a vl)
            | SupD of ('a vl) * ('a vl)
+           | DPairD of ('a vl) * ('a vl)
            | SynD of ('a ne)
            | BotD
-           | DPairD of ('a vl) * ('a vl)
-
 
 let arrD (a : 'a vl) (b : 'a vl) : ('a vl) = PiD(a, fun _ -> b)
 
@@ -225,11 +274,12 @@ and reify (a : 'a vl) (v : 'a vl) : ('a nf) =
   | _, FalseD -> Neu_ False_
   | _, StarD -> Neu_ Star_
   | _, SynD t -> Neu_ t
-  | SynD _, _ -> failwith "Failed to reify value!"
+  | SynD neu, _ -> (printf "%a@\n" pp_tm_str (ne_tm neu)); failwith "Failed to reify value!"
   | _, BotD | BotD, _ -> failwith "Cannot reify BotD!"
   | _ -> failwith "Cannot reify ill-typed value!"
 
 and reflect (a : 'a vl) (t : 'a ne) : ('a vl) =
+  (* (printf "Reflecting term: %a@\n" pp_tm_str (ne_tm t)); *)
   match a with
   | PiD(a,f) -> LamD (fun v -> reflect (f v) (App_(t, reify a v)))
   | _ -> SynD t
@@ -242,77 +292,44 @@ let nbeT (a : ('a vl) tm) : 'a nf =
   reifyT (eval a)
 
 (****************************************************************)
-(* Printing                                                     *)
-(****************************************************************)
-
-(* Inject normal terms to terms *)
-let rec nf_tm (t : 'a nf) : 'a tm =
-  match t with
-  | Lam_ f -> Lam (fun x -> nf_tm (f x))
-  | Neu_ n -> ne_tm n
-and ne_tm (t : 'a ne) : 'a tm =
-  match t with
-  | App_ (t,u) -> App (ne_tm t, nf_tm u)
-  | Var_ x -> Var x
-  | Z_ -> Z
-  | S_ u -> S (nf_tm u)
-  | NatRec_ (a,z,s) -> NatRec (nf_tm a,nf_tm z, nf_tm s)
-  | Sup_(x,s) -> Sup(nf_tm x, nf_tm s)
-  | WRec_ (w,c,lim) -> WRec (nf_tm w, nf_tm c, nf_tm lim)
-  | Nat_ -> Nat
-  | Pi_(a,fam) -> Pi(nf_tm a, fun x -> nf_tm (fam x))
-  | W_(a,fam) -> W(nf_tm a, fun x -> nf_tm (fam x))
-  | Sigma_(a,fam) -> Sigma(nf_tm a, fun x -> nf_tm (fam x))
-  | Type_ -> Type
-  | Empty_ -> Empty
-  | EmptyElim_(a) -> EmptyElim(nf_tm a)
-  | Unit_ -> Unit
-  | Star_ -> Star
-  | Bool_ -> Bool
-  | True_ -> True
-  | False_ -> False
-  | BoolElim_(a,b,s,t) -> BoolElim(nf_tm a, nf_tm b, nf_tm s, nf_tm t)
-  | DPair_(s,t) -> DPair(nf_tm s, nf_tm t)
-  | P1_(s) -> P1(nf_tm s)
-  | P2_(s) -> P2(nf_tm s)
-
-let gensym =
-  (let x = ref 0 in
-   fun () ->
-   incr x ;
-   "x" ^ string_of_int !x)
-
-let pp_var ppf s = Format.fprintf ppf "%s" s
-
-let pp_tm_str = pp_tm gensym pp_var
-
-(****************************************************************)
 (* Tests                                                        *)
 (****************************************************************)
 
-(* lim : (x : Bool) -> (Unit + Empty -> Nat) -> Nat  *)
+(* Combinators for the lambda calculus *)
+let _I = Lam (fun x -> Var x)
+let _K = Lam (fun x -> Lam (fun y -> Var y))
+let _S = Lam (fun x -> Lam (fun y -> Lam (fun z -> App(App(Var x, Var z),App(Var y, Var z)))))
+
+
+(* Constructions with natural numbers *)
+let _succ = Lam (fun x -> S (Var x))
+let _add = Lam (fun x -> Lam (fun y -> App(NatRec(Nat, Var y, _succ),Var x)))
+let _mul = Lam (fun x -> Lam (fun y -> App(NatRec(Nat, Z, App(_add, Var x)), Var y)))
+(* The Ackermann function *)
+let _ack = NatRec(Pi(Nat,fun _ -> Nat), _succ, Lam(fun f -> NatRec(Nat, App(Var f, S Z), Var f)))
+
+let _1 = S Z
+let _2 = S _1
+let _3 = S _2
+let _4 = S _3
+let _5 = S _4
+let _6 = S _5
+let _7 = S _6
+let _8 = S _7
+let _9 = S _8
+
+
+(* Construct Nat as a W-type using Bool, Unit, and Empty with constructors
+     wZ : (Empty -> wNat) -> wNat
+     wS : (Unit -> wNat) -> wNat
+   and eliminator
+     wNatRec : (a : Type) -> (z : a) -> (f : a -> a) -> wNat -> a  *)
 let _wNat = W(Bool,fun b -> BoolElim(Type,Var b,Unit,Empty))
 let _wZ = Sup(False, EmptyElim _wNat)
 let _wS = Lam (fun n -> Sup(True, Lam (fun _ -> Var n)))
-let _wadd = Lam (fun x -> Lam (fun y -> App(WRec(_wNat,
-                                                 _wNat,
-                                                 Lam (fun b ->
-                                                     Lam (fun s ->
-                                                         BoolElim(_wNat,Var b,App(_wS,App(Var s,Star)),Var y)))),
-                                            Var x)))
-let _wmul = Lam (fun x -> Lam (fun y -> App(WRec(_wNat, _wNat,
-                                                Lam (fun b ->
-                                                    Lam (fun s ->
-                                                        BoolElim(_wNat,Var b, App(App(_wadd, Var x),App(Var s,Star)), _wZ)))), Var y)))
-
-
-let _wNatRec = Lam (fun a ->
-                   Lam (fun z ->
-                       Lam (fun f -> WRec(_wNat, Var a,
-                                          Lam (fun b ->
-                                              Lam (fun s ->
-                                                  BoolElim(Var a, Var b, App(Var f, App(Var s, Star)), Var z)))))))
-
+let _wadd = Lam (fun x -> Lam (fun y -> App(WRec(_wNat, _wNat, Lam (fun b -> Lam (fun s -> BoolElim(_wNat,Var b,App(_wS,App(Var s,Star)),Var y)))), Var x)))
+let _wmul = Lam (fun x -> Lam (fun y -> App(WRec(_wNat, _wNat, Lam (fun b -> Lam (fun s -> BoolElim(_wNat,Var b, App(App(_wadd, Var x),App(Var s,Star)), _wZ)))), Var y)))
+let _wNatRec = Lam (fun a -> Lam (fun z -> Lam (fun f -> WRec(_wNat, Var a, Lam (fun b -> Lam (fun s -> BoolElim(Var a, Var b, App(Var f, App(Var s, Star)), Var z)))))))
 let _wadd' = Lam (fun x -> Lam (fun y -> App(App(App(App(_wNatRec, _wNat), Var y), _wS),Var x)))
 
 let _w1 = App(_wS,_wZ)
@@ -326,66 +343,58 @@ let _w8 = App(_wS, _w7)
 let _w9 = App(_wS, _w8)
 
 
-
-(* for ordinals, we need 3 = 1 + 1 + 1 *)
+(* To construct ordinals, we need the three element type:
+     Three = Bool + Unit
+   with constructors
+     zero, one, two : Three
+   and eliminator
+     ThreeElim : (a : Type) -> Three -> a -> a -> a -> a   *)
 let _Three = Sigma(Bool, fun b -> BoolElim(Type,Var b, Bool, Unit))
 let _zero = DPair(False, Star)
 let _one = DPair(True,False)
 let _two = DPair(True,True)
-let _matchThree = Lam (fun a -> Lam (fun t -> Lam (fun x0 -> Lam (fun x1 -> Lam (fun x2 -> BoolElim(Var a,P1(Var t),BoolElim(Var a,P2(Var t),Var x2,Var x1),Var x0))))))
+let _ThreeElim = Lam (fun a -> Lam (fun t -> Lam (fun x0 -> Lam (fun x1 -> Lam (fun x2 -> BoolElim(Var a,P1(Var t),BoolElim(Var a,P2(Var t),Var x2,Var x1),Var x0))))))
 
 
-let _Ord = W(_Three, fun t -> App(App(App(App(App(_matchThree,Type),Var t), Empty), Unit), Nat))
+(* Construct Type of ordinals as a W-type using Three, Empty, Unit, and Nat with constructors
+     OrdZ : (Empty -> Ord) -> Ord
+     OrdS : (Unit -> Ord) -> Ord
+     OrdLim : (Nat -> Ord) -> Ord
+   and eliminator
+     OrdRec : (a : Type) -> a -> (a -> a) -> ((Nat -> a) -> a) -> Ord -> a   *)
+let _Ord = W(_Three, fun t -> App(App(App(App(App(_ThreeElim,Type),Var t), Empty), Unit), Nat))
 let _OrdZ = Sup(_zero, EmptyElim _Ord)
 let _OrdS = Lam (fun x -> Sup(_one, Lam (fun _ -> Var x)))
 let _OrdLim = Lam (fun f -> Sup(_two, Var f))
 let _OrdRec = Lam (fun a -> Lam (fun z -> Lam (fun succ -> Lam (fun lim -> WRec(_Ord, Var a, Lam (fun t -> Lam (fun s ->
-                                                          App(App(App(App(App(_matchThree,Var a), Var t), Var z), App(Var succ,App(Var s, Star))), App(Var lim, Var s)))))))))
+                                                          App(App(App(App(App(_ThreeElim,Var a), Var t), Var z), App(Var succ,App(Var s, Star))), App(Var lim, Var s)))))))))
 
+(* some ordinals *)
 let _omega = App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,_OrdZ,_OrdS), Var n)))
 let _2omega = App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,_omega,_OrdS), Var n)))
-(* let _omega2 = App(_OrdLim, Lam (fun n ->  *)
-
-let _1 = S Z
-let _2 = S _1
-let _3 = S _2
-let _4 = S _3
-let _5 = S _4
-let _6 = S _5
-let _7 = S _6
-let _8 = S _7
-let _9 = S _8
 
 
-let _NN = Pi(Nat,fun _ -> Nat)
 
-let _succ = Lam (fun x -> S (Var x))
-let _I = Lam (fun x -> Var x)
-let _K = Lam (fun x -> Lam (fun y -> Var y))
-let _S = Lam (fun x -> Lam (fun y -> Lam (fun z -> App(App(Var x, Var z),App(Var y, Var z)))))
-let _add = Lam (fun x -> Lam (fun y -> App(NatRec(Nat, Var y, _succ),Var x)))
-let _mul = Lam (fun x -> Lam (fun y -> App(NatRec(Nat, Z, App(_add, Var x)), Var y)))
-let _ack = NatRec(_NN, _succ, Lam(fun f -> NatRec(Nat, App(Var f, _1), Var f)))
-
+(* Tests should be of the form (term, type) *)
 let tests
-  = [(_succ, _NN);
-     (Lam (fun f -> Lam (fun x -> App (Var f,Var x))), Pi(_NN, fun _ -> _NN));
-     (Lam (fun x -> App (Lam (fun y -> Var y), Var x)), _NN);
+  = [(_succ, Pi(Nat,fun _ -> Nat));
+     (Lam (fun f -> Lam (fun x -> App (Var f,Var x))), Pi(Pi(Nat,fun _ -> Nat), fun _ -> Pi(Nat,fun _ -> Nat)));
+     (Lam (fun x -> App (Lam (fun y -> Var y), Var x)), Pi(Nat,fun _ -> Nat));
      (App (Lam (fun x -> S (Var x)), S Z), Nat);
-     (Lam (fun x -> S (Var x)), _NN);
-     (Lam (fun x -> App (Lam (fun x -> S (Var x)), S (Var x))), _NN);
-     (Lam (fun x -> Lam (fun y -> App (Var x,Var y))), Pi(_NN, fun _ -> _NN));
-     (Lam (fun x -> Lam (fun y -> App (App (Var x,Var y), S (Var y)))), Pi(Pi(Nat,fun _ -> _NN), fun _ -> _NN));
-     (Lam (fun x -> Lam (fun y -> Var y)), Pi(Nat,fun _ -> _NN));
-     (App(Lam (fun x -> Lam (fun y -> App (App (Var x,Var y), S (Var y)))), _K), _NN);
+     (Lam (fun x -> S (Var x)), Pi(Nat,fun _ -> Nat));
+     (Lam (fun x -> App (Lam (fun x -> S (Var x)), S (Var x))), Pi(Nat,fun _ -> Nat));
+     (Lam (fun x -> Lam (fun y -> App (Var x,Var y))), Pi(Pi(Nat,fun _ -> Nat), fun _ -> Pi(Nat,fun _ -> Nat)));
+     (Lam (fun x -> Lam (fun y -> App (App (Var x,Var y), S (Var y)))), Pi(Pi(Nat,fun _ -> Pi(Nat,fun _ -> Nat)), fun _ -> Pi(Nat,fun _ -> Nat)));
+     (Lam (fun x -> Lam (fun y -> Var y)), Pi(Nat,fun _ -> Pi(Nat,fun _ -> Nat)));
+     (App(Lam (fun x -> Lam (fun y -> App (App (Var x,Var y), S (Var y)))), _K), Pi(Nat,fun _ -> Nat));
      (App(Lam (fun x -> Lam (fun y -> App (App (App (Var x,Var y), S (Var y)), S (S (Var y))))),
-          Lam (fun x -> Lam (fun y -> Lam (fun z -> Var z)))), _NN);
+          Lam (fun x -> Lam (fun y -> Lam (fun z -> Var z)))), Pi(Nat,fun _ -> Nat));
      (Lam (fun id -> App(App(Var id,App(Lam (fun x -> Var x), Z)),Z)), Pi(Pi(Nat,fun _ -> Pi(Nat,fun _ -> Type)),fun _ -> Type));
-     (_add, Pi(Nat,fun _ -> _NN));
-     (_mul, Pi(Nat,fun _ -> _NN));
+     (_add, Pi(Nat,fun _ -> Pi(Nat,fun _ -> Nat)));
+     (_mul, Pi(Nat,fun _ -> Pi(Nat,fun _ -> Nat)));
      (App(App(_add, _5), _7), Nat);
      (App(App(_mul, _3), _4), Nat);
-     (Lam (fun x -> App(App(_mul, _3), Var x)), _NN);
+     (Lam (fun x -> App(App(_mul, _3), Var x)), Pi(Nat,fun _ -> Nat));
      (App(App(_ack, _2), App(App(_mul,_2),_3)), Nat);
      (Empty, Type);
      (Unit, Type);
@@ -402,8 +411,7 @@ let tests
      (App(WRec(_wNat, _wNat, Lam (fun b ->
                              Lam (fun s ->
                                  BoolElim(_wNat,Var b,App(_wS,App(Var s,Star)),App(_wS,App(_wS,App(_wS,_wZ))))))),App(_wS,App(_wS,_wZ))), _wNat);
-     (NatRec(Nat, Z, _succ), _NN);
-
+     (NatRec(Nat, Z, _succ), Pi(Nat,fun _ -> Nat));
      (WRec(_wNat, _wNat, Lam (fun b ->
                              Lam (fun s ->
                                  BoolElim(_wNat,Var b,App(_wS,App(Var s,Star)),_wZ)))), Pi(_wNat, fun _ -> _wNat));
@@ -418,7 +426,7 @@ let tests
      (P2(DPair(False,S Z)), Nat);
      (Lam (fun p -> DPair(P1(Var p), P2(P1(DPair(Var p,Z))))), Pi(Sigma(Bool,fun b -> (BoolElim(Type,Var b, Unit, Nat))),
                                                                   fun _ -> Sigma(Bool,fun b -> (BoolElim(Type,Var b, Unit, Nat)))));
-     (App(App(App(App(App(_matchThree,Nat),_zero),Z),S Z), S (S Z)), Nat);
+     (App(App(App(App(App(_ThreeElim,Nat),_zero),Z),S Z), S (S Z)), Nat);
      (_omega, _Ord);
      (_OrdRec, Pi(Type,fun a -> Pi(Var a,fun _ -> Pi(Pi(Var a, fun _ -> Var a), fun _ -> Pi(Pi(Pi(Nat, fun _ -> Var a), fun _ -> Var a), fun _ -> Pi(_Ord, fun _ -> Var a))))));
     ]
