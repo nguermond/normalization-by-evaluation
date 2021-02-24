@@ -1,6 +1,7 @@
 open Format
 
 
+(* Terms *)
 type 'a tm = Var of 'a
            (* Empty type *)
            | Empty
@@ -68,7 +69,7 @@ let rec pp_tm gensym pp_a ppf (t : 'a tm) =
   | P2(s) -> fprintf ppf "(π₂ %a)" pp_tm s
 
 
-
+(* Normal/Neutral terms *)
 type 'a nf = Lam_ of ('a -> 'a nf)
            | Neu_ of ('a ne)
 and 'a ne = App_ of ('a ne) * ('a nf)
@@ -95,36 +96,7 @@ and 'a ne = App_ of ('a ne) * ('a nf)
           | P1_ of ('a nf)
           | P2_ of ('a nf)
 
-let rec nf_tm (t : 'a nf) : 'a tm =
-  match t with
-  | Lam_ f -> Lam (fun x -> nf_tm (f x))
-  | Neu_ n -> ne_tm n
-and ne_tm (t : 'a ne) : 'a tm =
-  match t with
-  | App_ (t,u) -> App (ne_tm t, nf_tm u)
-  | Var_ x -> Var x
-  | Z_ -> Z
-  | S_ u -> S (nf_tm u)
-  | NatRec_ (a,z,s) -> NatRec (nf_tm a,nf_tm z, nf_tm s)
-  | Sup_(x,s) -> Sup(nf_tm x, nf_tm s)
-  | WRec_ (w,c,lim) -> WRec (nf_tm w, nf_tm c, nf_tm lim)
-  | Nat_ -> Nat
-  | Pi_(a,fam) -> Pi(nf_tm a, fun x -> nf_tm (fam x))
-  | W_(a,fam) -> W(nf_tm a, fun x -> nf_tm (fam x))
-  | Sigma_(a,fam) -> Sigma(nf_tm a, fun x -> nf_tm (fam x))
-  | Type_ -> Type
-  | Empty_ -> Empty
-  | EmptyElim_(a) -> EmptyElim(nf_tm a)
-  | Unit_ -> Unit
-  | Star_ -> Star
-  | Bool_ -> Bool
-  | True_ -> True
-  | False_ -> False
-  | BoolElim_(a,b,s,t) -> BoolElim(nf_tm a, nf_tm b, nf_tm s, nf_tm t)
-  | DPair_(s,t) -> DPair(nf_tm s, nf_tm t)
-  | P1_(s) -> P1(nf_tm s)
-  | P2_(s) -> P2(nf_tm s)
-
+(* Values *)
 type 'a vl = PiD of ('a vl) * ('a vl -> 'a vl)
            | WD of ('a vl) * ('a vl -> 'a vl)
            | SigmaD of ('a vl) * ('a vl -> 'a vl)
@@ -148,6 +120,28 @@ type 'a vl = PiD of ('a vl) * ('a vl -> 'a vl)
 
 let arrD (a : 'a vl) (b : 'a vl) : ('a vl) = PiD(a, fun _ -> b)
 
+let sigma_P1D (u : 'a vl) : 'a vl =
+  match u with
+  | DPairD(v,_) -> v
+  | SynD s -> SynD (P1_(Neu_ s))
+  | _ -> BotD
+
+let sigma_P2D (u : 'a vl) : 'a vl =
+  match u with
+  | DPairD(_,v) -> v
+  | SynD s -> SynD (P2_(Neu_ s))
+  | _ -> BotD
+
+let dpairD (u : 'a vl) (v : 'a vl) : 'a vl =
+  match (u,v) with
+  | SynD(P1_(Neu_ s)), SynD(P2_(Neu_ t)) when s = t -> SynD(s)
+  | _ -> DPairD(u,v)
+
+let appD (t : 'a vl) (u : 'a vl) : ('a vl) =
+  match (t,u) with
+  | _, BotD -> BotD
+  | LamD f,_ -> (f u)
+  | _ -> BotD
 
 let rec nat_recD (a : 'a vl) (z : 'a vl) (f : 'a vl) : 'a vl =
   LamD (fun v ->
@@ -175,33 +169,6 @@ and bool_elimD (a : 'a vl) (b : 'a vl) (u : 'a vl) (v : 'a vl) : 'a vl =
   | FalseD -> v
   | SynD s -> SynD (BoolElim_(reifyT a, Neu_ s, reify a u, reify a v))
   | _ -> BotD
-
-and sigma_P1D (u : 'a vl) : 'a vl =
-  match u with
-  | DPairD(v,_) -> v
-  | SynD s -> SynD (P1_(Neu_ s))
-  | _ -> BotD
-
-and sigma_P2D (u : 'a vl) : 'a vl =
-  match u with
-  | DPairD(_,v) -> v
-  | SynD s -> SynD (P2_(Neu_ s))
-  | _ -> BotD
-
-(* eta equality *)
-and dpairD (u : 'a vl) (v : 'a vl) : 'a vl =
-  match (u,v) with
-  | SynD(P1_(Neu_ s)), SynD(P2_(Neu_ t)) when s = t -> SynD(s)
-  | _ -> DPairD(u,v)
-
-and appD (t : 'a vl) (u : 'a vl) : ('a vl) =
-  match (t,u) with
-  | _, BotD -> BotD
-  | LamD f,_ -> (f u)
-  | _ -> BotD
-
-and unit_elimD (a : 'a vl) (u : 'a vl) : 'a vl =
-  LamD (fun _ -> u)
 
 and eval (t : ('a vl) tm) : ('a vl) =
   match t with
@@ -277,6 +244,38 @@ let nbeT (a : ('a vl) tm) : 'a nf =
 (****************************************************************)
 (* Printing                                                     *)
 (****************************************************************)
+
+(* Inject normal terms to terms *)
+let rec nf_tm (t : 'a nf) : 'a tm =
+  match t with
+  | Lam_ f -> Lam (fun x -> nf_tm (f x))
+  | Neu_ n -> ne_tm n
+and ne_tm (t : 'a ne) : 'a tm =
+  match t with
+  | App_ (t,u) -> App (ne_tm t, nf_tm u)
+  | Var_ x -> Var x
+  | Z_ -> Z
+  | S_ u -> S (nf_tm u)
+  | NatRec_ (a,z,s) -> NatRec (nf_tm a,nf_tm z, nf_tm s)
+  | Sup_(x,s) -> Sup(nf_tm x, nf_tm s)
+  | WRec_ (w,c,lim) -> WRec (nf_tm w, nf_tm c, nf_tm lim)
+  | Nat_ -> Nat
+  | Pi_(a,fam) -> Pi(nf_tm a, fun x -> nf_tm (fam x))
+  | W_(a,fam) -> W(nf_tm a, fun x -> nf_tm (fam x))
+  | Sigma_(a,fam) -> Sigma(nf_tm a, fun x -> nf_tm (fam x))
+  | Type_ -> Type
+  | Empty_ -> Empty
+  | EmptyElim_(a) -> EmptyElim(nf_tm a)
+  | Unit_ -> Unit
+  | Star_ -> Star
+  | Bool_ -> Bool
+  | True_ -> True
+  | False_ -> False
+  | BoolElim_(a,b,s,t) -> BoolElim(nf_tm a, nf_tm b, nf_tm s, nf_tm t)
+  | DPair_(s,t) -> DPair(nf_tm s, nf_tm t)
+  | P1_(s) -> P1(nf_tm s)
+  | P2_(s) -> P2(nf_tm s)
+
 let gensym =
   (let x = ref 0 in
    fun () ->
