@@ -17,6 +17,9 @@ Domain semantics [1] with de Bruijn syntax.
 
 ### References
 [1] Andreas Abel, Klaus Aehlig, Peter Dybjer. *Normalization by evaluation for Martin-Löf type theory with one universe.* 2007.
+
 [2] Andrzej Filinski. *Normalization by evaluation for the computational lambda-calculus.* 2001.
+
 [3] Thorsten Altenkirch, Martin Hofmann, Thomas Streicher. *Categorical reconstruction of a reduction free normalization proof.* 1995(?).
+
 [4] Thorsten Altenkirch, Ambrus Kaposi. *Normalization by evaluation for type theory, in type theory.* 2017.
