@@ -11,8 +11,6 @@ type tm = Var of int
         | Lam of tm
         | App of tm * tm
 
-type con = ty list
-
 let pp_tm ppf (t : tm) =
   let rec pp_tm_ k ppf t =
     match t with
