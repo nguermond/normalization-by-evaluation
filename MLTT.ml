@@ -261,7 +261,7 @@ and reifyT (a : 'a vl) : ('a nf) =
 
 and reify (a : 'a vl) (v : 'a vl) : ('a nf) =
   match (a,v) with
-  | _, EmptyElimD b -> Neu_ (EmptyElim_ (reifyT b))
+  | _, EmptyElimD b -> Neu_ (EmptyElim_ (reifyT b))  (* Why is this needed? *)
   | PiD(a,fam), g -> Lam_ (fun x -> (let v = (reflect a (Var_ x)) in
                                      reify (fam v) (appD g v)))
   | WD(a,fam), SupD(u,s) -> Neu_ (Sup_(reify a u, reify (PiD(fam u, fun _ -> WD(a,fam))) s))
@@ -275,13 +275,14 @@ and reify (a : 'a vl) (v : 'a vl) : ('a nf) =
   | _, StarD -> Neu_ Star_
   | _, SynD t -> Neu_ t
   | SynD neu, _ -> (printf "%a@\n" pp_tm_str (ne_tm neu)); failwith "Failed to reify value!"
-  | _, BotD | BotD, _ -> failwith "Cannot reify BotD!"
+  | _, BotD -> failwith "Cannot reify BotD!"
+  | BotD, _ -> failwith "Cannot reify value of type BotD!"
   | _ -> failwith "Cannot reify ill-typed value!"
 
 and reflect (a : 'a vl) (t : 'a ne) : ('a vl) =
-  (* (printf "Reflecting term: %a@\n" pp_tm_str (ne_tm t)); *)
   match a with
-  | PiD(a,f) -> LamD (fun v -> reflect (f v) (App_(t, reify a v)))
+  | PiD(a,fam) -> LamD (fun v -> reflect (fam v) (App_(t, reify a v)))
+  | BotD -> failwith "Cannot reflect term of type BotD!"
   | _ -> SynD t
 
 
@@ -369,10 +370,23 @@ let _OrdLim = Lam (fun f -> Sup(_two, Var f))
 let _OrdRec = Lam (fun a -> Lam (fun z -> Lam (fun succ -> Lam (fun lim -> WRec(_Ord, Var a, Lam (fun t -> Lam (fun s ->
                                                           App(App(App(App(App(_ThreeElim,Var a), Var t), Var z), App(Var succ,App(Var s, Star))), App(Var lim, Var s)))))))))
 
-(* some ordinals *)
-let _omega = App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,_OrdZ,_OrdS), Var n)))
-let _2omega = App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,_omega,_OrdS), Var n)))
+let _OrdAdd = Lam (fun u -> Lam (fun v -> App(App(App(App(App(_OrdRec, _Ord), Var u), _OrdS), _OrdLim), Var v)))
+let _OrdMul = Lam (fun u -> Lam (fun v -> App(App(App(App(App(_OrdRec, _Ord), _OrdZ), Lam (fun w -> App(App(_OrdAdd, Var w), Var u))), _OrdLim), Var v)))
+let _OrdExp = Lam (fun u -> Lam (fun v -> App(App(App(App(App(_OrdRec, _Ord), App(_OrdS,_OrdZ)), Lam (fun w -> App(App(_OrdMul, Var w), Var u))), _OrdLim), Var v)))
 
+
+(* some ordinals *)
+let _add_omega = Lam (fun ord -> App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,Var ord,_OrdS), Var n))))
+let _omega = App(_add_omega, _OrdZ)
+let _add_omega_2 = Lam (fun ord -> App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,Var ord, _add_omega), Var n))))
+let _omega_2 = App(_add_omega_2, _OrdZ)
+let _add_omega_3 = Lam (fun ord -> App(_OrdLim, Lam (fun n -> App(NatRec(_Ord, Var ord, _add_omega_2), Var n))))
+let _omega_3 = App(_add_omega_3, _OrdZ)
+let _add_omega_n = Lam (fun m -> App(NatRec(Pi(_Ord,fun _ -> _Ord), _I,
+                                             Lam (fun add_omega_n -> Lam (fun ord -> App(_OrdLim, Lam (fun n -> App(NatRec(_Ord, Var ord, Var add_omega_n), Var n)))))), Var m))
+let _omega_omega = App(_OrdLim, Lam (fun n -> App(App(_add_omega_n, Var n), _OrdZ)))
+
+let _epsilon_0 = App(_OrdLim, Lam (fun n -> App(NatRec(_Ord,_omega, App(_OrdExp,_omega)), Var n)))
 
 
 (* Tests should be of the form (term, type) *)
@@ -427,8 +441,16 @@ let tests
      (Lam (fun p -> DPair(P1(Var p), P2(P1(DPair(Var p,Z))))), Pi(Sigma(Bool,fun b -> (BoolElim(Type,Var b, Unit, Nat))),
                                                                   fun _ -> Sigma(Bool,fun b -> (BoolElim(Type,Var b, Unit, Nat)))));
      (App(App(App(App(App(_ThreeElim,Nat),_zero),Z),S Z), S (S Z)), Nat);
-     (_omega, _Ord);
      (_OrdRec, Pi(Type,fun a -> Pi(Var a,fun _ -> Pi(Pi(Var a, fun _ -> Var a), fun _ -> Pi(Pi(Pi(Nat, fun _ -> Var a), fun _ -> Var a), fun _ -> Pi(_Ord, fun _ -> Var a))))));
+     (_omega, _Ord);
+     (_omega_2, _Ord);
+     (_omega_3, _Ord);
+     (_add_omega, Pi(_Ord, fun _ -> _Ord));
+     (* (App(App(_OrdAdd,_omega),_omega), _Ord);
+      * (App(_OrdAdd,_omega), Pi(_Ord, fun _ -> _Ord)); *)
+     (* (* These do not work!*)
+     (_add_omega_n, Pi(Nat,fun _ -> Pi(_Ord, fun _ -> _Ord)));
+     (_omega_omega, _Ord); *)
     ]
 
 
