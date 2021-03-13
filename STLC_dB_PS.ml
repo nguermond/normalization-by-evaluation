@@ -46,7 +46,6 @@ let pp_ne ppf (t : ne) = pp_tm ppf (ne_tm t)
     W_id : hom(Γ,Γ)
     W1 : hom(Γ, Δ) → hom(Γ×U, Δ)
     W2 : hom(U, Δ) → hom(Γ×U, Δ×U)
-   Note that this is for a single base type.
  *)
 type wk = W_id
         | W1 of wk
@@ -83,7 +82,7 @@ and wk_ne (w : wk) (t : ne) : ne =
   | W_id, _ -> t
   | _,    Star_ -> Star_
   | _,    App_(t,u) -> App_(wk_ne w t, wk_nf w u)
-  | W1 w, Var_ x -> Var_ (x + 1)
+  | W1 w, Var_ x -> wk_ne w (Var_ (x + 1))
   | W2 w, Var_ x -> (if x = 0 then (Var_ 0) else (wk_ne w (Var_ (x - 1))))
 
 
@@ -109,20 +108,15 @@ let rec eval (t : tm) (env : vl list) : vl =
   | App(t,u) -> appD (eval t env) (eval u env)
 
 and reify (a : ty) (u : vl) : nf =
-  (printf "Reifying %a.@\n" pp_vl u);
-  (let res =
-     match (a,u) with
-     | Unit, UnitD s -> s
-     | Arr(a,b), ArrD f -> Lam_ (reify b (f (W1 W_id) (reflect a (Var_ 0))))
-     | _ -> failwith "Failure in reify!"
-   in (printf "Reified %a.@\n" pp_nf res); res)
+  match (a,u) with
+  | Unit, UnitD s -> s
+  | Arr(a,b), ArrD f -> Lam_ (reify b (f (W1 W_id) (reflect a (Var_ 0))))
+  | _ -> failwith "Failure in reify!"
+
 and reflect (a : ty) (t : ne) : vl =
-  (printf "Reflecting %a.@\n" pp_ne t);
-  (let res =
-     match (a,t) with
-     | Arr(a,b), t -> ArrD(fun w u -> reflect b (App_(wk_ne w t, reify a u)))
-     | Unit, _ -> UnitD (Neu t)
-   in (printf "Reflected %a.@\n" pp_vl res); res)
+  match (a,t) with
+  | Arr(a,b), t -> ArrD(fun w u -> reflect b (App_(wk_ne w t, reify a u)))
+  | Unit, _ -> UnitD (Neu t)
 
 
 
@@ -151,11 +145,9 @@ let tests : (tm * ty) list
      (Lam (App (_I, Var 0)), _UU);
      (Star, Unit);
      (App(_I, Star), Unit);
-     (_S, Arr(_UUU,Arr(_UU,_UU)));   (* Normal form is incorrect!! *)
+     (_S, Arr(_UUU,Arr(_UU,_UU)));
      (Lam(Lam (App(App(_K, Var 0),App(Var 1, Var 0)))), Arr(_UU,_UU));
      (App(Lam (Lam (App(App(Var 1,Var 0), App(_I, Var 0)))),_K), _UU);
-     (* (App(Lam (fun x -> Lam (fun y -> App (App (App (Var x,Var y), S (Var y)), S (S (Var y))))),
-      *      Lam (fun x -> Lam (fun y -> Lam (fun z -> Var z)))), Arr(Nat,Nat)); *)
     ]
 
 
