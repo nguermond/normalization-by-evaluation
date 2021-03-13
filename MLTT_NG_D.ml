@@ -169,6 +169,7 @@ type 'a vl = PiD of ('a vl) * ('a vl -> 'a vl)
 
 let arrD (a : 'a vl) (b : 'a vl) : ('a vl) = PiD(a, fun _ -> b)
 
+(* We need to use reflect here! *)
 let sigma_P1D (u : 'a vl) : 'a vl =
   match u with
   | DPairD(v,_) -> v
@@ -197,8 +198,7 @@ let rec nat_recD (a : 'a vl) (z : 'a vl) (f : 'a vl) : 'a vl =
       match v with
       | ZD -> z
       | SD u -> (appD f (appD (nat_recD a z f) u))
-      | SynD s -> SynD (App_(NatRec_(reifyT a, reify a z, reify (arrD a a) f), Neu_ s))
-      | _ -> BotD)
+      | _ -> reflect a (App_(NatRec_(reifyT a, reify a z, reify (arrD a a) f), reify a v)))
 
 (* For a W-Type W(A,x.B), we have
      sup : (x : A) -> (B(x) -> W(A,x.B)) -> W(A,x.B)
@@ -208,16 +208,16 @@ and w_recD (w : 'a vl) (c : 'a vl) (lim : 'a vl) : 'a vl =
   LamD (fun v ->
       match (v,w) with
       | SupD(x,s), _ -> appD (appD lim x) (LamD (fun u -> appD (w_recD w c lim) (appD s u)))
-      | SynD s, WD(a,fam) -> SynD (App_(WRec_(reifyT w, reifyT c,
-                                              reify (PiD(a,fun u -> arrD (arrD (fam u) c) c)) lim), Neu_ s))
-      | _ -> BotD)
+      | _,         WD(a,fam) -> reflect c (App_(WRec_(reifyT w, reifyT c,
+                                                      reify (PiD(a,fun u -> arrD (arrD (fam u) c) c)) lim), reify c v))
+      (* What if the type does not evaluate to WD(_,_)?? maybe because it depends on some variable *)
+      | _ -> failwith "Ill-typed w_recD!")
 
 and bool_elimD (a : 'a vl) (b : 'a vl) (u : 'a vl) (v : 'a vl) : 'a vl =
   match b with
   | TrueD -> u
   | FalseD -> v
-  | SynD s -> SynD (BoolElim_(reifyT a, Neu_ s, reify a u, reify a v))
-  | _ -> BotD
+  | _ -> reflect a (BoolElim_(reifyT a, reify BoolD b, reify a u, reify a v))
 
 and eval (t : ('a vl) tm) : ('a vl) =
   match t with
@@ -445,12 +445,14 @@ let tests
      (_omega, _Ord);
      (_omega_2, _Ord);
      (_omega_3, _Ord);
+     (_epsilon_0, _Ord);
      (_add_omega, Pi(_Ord, fun _ -> _Ord));
-     (* (App(App(_OrdAdd,_omega),_omega), _Ord);
-      * (App(_OrdAdd,_omega), Pi(_Ord, fun _ -> _Ord)); *)
-     (* (* These do not work!*)
-     (_add_omega_n, Pi(Nat,fun _ -> Pi(_Ord, fun _ -> _Ord)));
-     (_omega_omega, _Ord); *)
+     (App(App(_OrdAdd,_omega),_omega), _Ord);
+     (App(_OrdAdd,_omega), Pi(_Ord, fun _ -> _Ord));
+     (_OrdAdd, Pi(_Ord, fun _ -> Pi(_Ord, fun _ -> _Ord)));
+     (* These do not work!*)
+     (* (_add_omega_n, Pi(Nat,fun _ -> Pi(_Ord, fun _ -> _Ord)));
+      * (_omega_omega, _Ord); *)
     ]
 
 

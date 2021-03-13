@@ -69,20 +69,18 @@ let rec succ (v : 'a vl) : 'a vl =
    | Syn s -> Syn (S_ (Neu s))
    | Fun _ -> failwith "Ill-typed value 'Fun'!")
 
-let rec nat_rec (a : ty) (z : 'a vl) (f : 'a vl) : 'a vl =
+let rec nat_recD (a : ty) (z : 'a vl) (f : 'a vl) : 'a vl =
   Fun (fun v ->
       (match v with
        | Num k -> (if k = 0 then z
-                   else (app f (app (nat_rec a z f) (Num (k - 1)))))
-       | Syn s -> Syn (App_ (Rec_ (a, reify a z, reify (Arr(a,a)) f), Neu s))
-       | Fun _ -> failwith "Ill-typed value 'Fun'!"))
+                   else (app f (app (nat_recD a z f) (Num (k - 1)))))
+       | _ -> reflect a (App_ (Rec_ (a, reify a z, reify (Arr(a,a)) f), reify a v))))
 (****************************************************************)
 (* reify and reflect: from intermediate to target               *)
 (****************************************************************)
 
 (* takes semantic objects to normal terms *)
 and reify (a : ty) (v : 'a vl) : 'a nf =
-  (*printf "@[<1>Reifying!@\n@]";*)
   (match (a,v) with
    | _, Syn n -> Neu n
    | Nat, Num k -> (if k>0 then (Neu (S_ (reify Nat (Num (k - 1)))))
@@ -92,7 +90,6 @@ and reify (a : ty) (v : 'a vl) : 'a nf =
 
 (* takes neutral terms to semantic objects *)
 and reflect (a : ty) (t : 'a ne) : 'a vl =
-  (*printf "@[<1>Reflecting!@\n@]";*)
   (match a with
    | Nat -> Syn t
    | Arr (a,b) ->
@@ -102,7 +99,7 @@ let rec eval (t : ('a vl) tm) : 'a vl =
   (match t with
    | Z -> zero
    | S u -> succ (eval u)
-   | Rec (a,z,s) -> nat_rec a (eval z) (eval s)
+   | Rec (a,z,s) -> nat_recD a (eval z) (eval s)
    | Var v -> v
    | Lam f -> Fun (fun v -> (eval (f v)))
    | App (t,u) -> app (eval t) (eval u))

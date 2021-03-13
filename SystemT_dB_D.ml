@@ -91,8 +91,7 @@ let rec nat_recD (a : ty) (z : vl) (f : vl) : vl =
       match v with
       | ZD -> z
       | SD u -> appD f (appD (nat_recD a z f) u)
-      | SynD s -> SynD (App_ (Rec_ (a, reify a z 0, reify (Arr(a,a)) f 0), Neu s))
-      | _ -> BotD)
+      | _ -> reflect a (App_ (Rec_ (a, reify a z 0, reify (Arr(a,a)) f 0), reify a v 0)) 0)
 
 (* takes semantic objects to normal terms *)
 and reify (a : ty) (v : vl) (k : int) : nf =
