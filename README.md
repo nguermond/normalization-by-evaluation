@@ -11,6 +11,7 @@ Domain semantics [1] with 'name generation' syntax [2].
 
 Presheaf semantics [3,4] with de Bruijn syntax.
 * [`STLC_dB_PS.ml`](./STLC_dB_PS.ml) : simply typed lambda calculus
+* [`STLC_dB_PS.agda`](./STLC_dB_PS.agda) : simply typed lambda calculus
 * [`Signatures_dB_PS.ml`](./Signatures_dB_PS.ml) : theory of signatures
 
 Domain semantics [1] with de Bruijn syntax.
