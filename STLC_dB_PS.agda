@@ -8,7 +8,7 @@ open import Data.String
 
 
 
-module STLC where
+module STLC_dB_PS where
   module Syntax where
     data Con : Set
     data Sub : Con -> Con -> Set
@@ -165,8 +165,6 @@ module STLC where
 
     open PSh
     open Syntax
-
-    --[_]w : {Γ Δ : Ren} -> (Wk Γ Δ) -> (Sub Γ Δ)
 
     NatT : PSh -> PSh -> Set
     NatT P Q = (Δ : Ren) -> (P .! Δ) -> (Q .! Δ)
