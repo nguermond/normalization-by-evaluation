@@ -49,7 +49,7 @@ let rec pp_con_ l k ppf (ctx : con) =
   match ctx with
   | NilC -> fprintf ppf "⊢@]"
   | TmC(a,t) -> fprintf ppf "@ ⊢  @[%a : %a@]@]" (pp_tm_ l) t (pp_ty_ l) a
-  | TyC a -> fprintf ppf "@ ⊢  @[%a@]@]" (pp_ty_ (l - k)) a
+  | TyC a -> fprintf ppf "@ ⊢  @[%a@]@]" (pp_ty_ l) a
   | ConsC(a,ctx) -> fprintf ppf "@ ▹ x%d:%a %a" (k + 1) (pp_ty_ k) a (pp_con_ l (k + 1)) ctx
 let pp_con ppf ctx = (fprintf ppf "@[<3>"); (pp_con_ (con_len ctx) 0 ppf ctx)
 
@@ -125,9 +125,9 @@ and wk_ne (w : wk) (t : ne) : ne =
 (* Values                                           *)
 (****************************************************)
 (* Term values *)
-type vltm = UD of nf
-          | ElD of vltm * nf
-          | PiD of (wk -> (vltm -> vltm))
+type vltm = UD of nf   (* value of type U *)
+          | ElD of vltm * nf  (* value of type El a *)
+          | PiD of (wk -> (vltm -> vltm)) (* value of type Pi *)
 (* Type values *)
 type vlty = VU
           | VEl of vltm
@@ -209,7 +209,8 @@ and reify_con (ctx : vlcon) : con =
   match ctx with
   | VNilC -> NilC
   | VTyC a -> TyC (reify_ty a)
-  | VTmC(a,t) -> TmC(reify_ty a, (nf_tm (reify_tm a t)))   (* Shouldn't I need to reify a before passing it to reify_tm? *)
+  (* Shouldn't I need to reify a before passing it to reify_tm? *)
+  | VTmC(a,t) -> TmC(reify_ty a, (nf_tm (reify_tm a t)))
   | VConsC(a,ctx) -> ConsC(reify_ty a, (let v = reflect_tm a (Var_ 0) in
                                         (reify_con (ctx (W1 W_id) v))))
 
