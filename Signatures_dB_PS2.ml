@@ -4,16 +4,6 @@ open List
 type tm = Var of int
         | App of tm * tm
         | Lam of tm
-(* Do we need another app/lam for IPi? *)
-(* | True *)
-(* | False *)
-(* | Star *)
-(* | WRec of tm * tm * tm * tm *)
-(* | Pair of tm * tm *)
-(* | P1 of tm *)
-(* | P2 of tm *)
-(* | EmptyE of tm *)
-
 
 (* ◻ is the judgement `Kind`
  * ★ is the judgement `Type`
