@@ -302,7 +302,7 @@ let _K = Lam (Lam (Var 1))
 (* (A -> (B -> C)) -> (A -> B) -> A -> C *)
 let _S = Lam (Lam (Lam (App(App(Var 2, Var 0),App(Var 1, Var 0)))))
 
-let tests
+let tm_ty
   = [(_I, Pi(U,U));
      (_K, Pi(U,Pi(U,U)));
      (Lam(App(_I,Var 0)), Pi(U,U));
@@ -325,11 +325,13 @@ let tests
       Pi(U, Pi(Pi(El(Var 0),Pi(El(Var 1),U)), Pi(El(Var 1), Pi(El(Var 2),U)))));
 
      (Lam (Lam (Lam (App(App(Var 2,Var 0),Var 0)))), Pi(Pi(U,Pi(U,U)),Pi(U,Pi(U,U))));
-     (Lam (* N : U *) (Lam (* 0 : El N*) (Lam (* S : El N -> El N *) (App(Var 0,App(Var 0,App(Var 0,Var 1)))))), Pi(U, Pi(El(Var 0), Pi(Pi(El(Var 1),El(Var 2)), El(Var 2)))))
+     (Lam (* N : U *) (Lam (* 0 : El N*) (Lam (* S : El N -> El N *) (App(Var 0,App(Var 0,App(Var 0,Var 1)))))), Pi(U, Pi(El(Var 0), Pi(Pi(El(Var 1),El(Var 2)), El(Var 2)))));
+
     ]
 
 let tm_ty_ctx
   = [([Pi(El(Var 1),El(Var 2)); El(Var 0); U], El(App(_I,Var 2)), App(Var 0,App(Var 0, App(Var 0, Var 1))));
+     ([U;Pi(U,U)], U, App(Var 1,App(Lam(Var 0),Var 0)));
     ]
 
 
@@ -358,8 +360,8 @@ let sigs
 
 
 let _ =
-  for i=0 to (length tests) - 1 do
-    (let p = (nth tests i) in
+  for i=0 to (length tm_ty) - 1 do
+    (let p = (nth tm_ty i) in
      (printf "(%d)@\n%a@ : %a@\n" i pp_tm (fst p) pp_ty (snd p));
      (printf "%a@ : %a@\n" pp_nf (nbe_tm [] (snd p) (fst p))
         pp_ty (nbe_ty [] (snd p))))

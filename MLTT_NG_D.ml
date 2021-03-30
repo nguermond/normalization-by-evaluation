@@ -3,6 +3,19 @@ open Format
 (****************************************************************)
 (* Terms                                                        *)
 (****************************************************************)
+(* Note: In the examples I use (BoolElim Type b Empty Unit),
+ * but I am not sure one should be able to do that, since the
+ * type of BoolElim should be
+ *   BoolElim : (A : Type) -> Bool -> A -> A,
+ * and Type is not of type Type. Perhaps this is a reason some
+ * of my tests with ordinals do not work.
+ *
+ * Instead we should introduce "large elimination", that is
+ *   BoolElimL : Bool -> Type -> Type -> Type
+ * with semantics
+ *   BoolElimL True A B --> A
+ *   BoolElimL False A B --> B.
+ *)
 type 'a tm = Var of 'a
            (* Empty type *)
            | Empty

@@ -1,6 +1,7 @@
 open Format
 open List
 
+(* Note: Here as well we need to introduce "large elimination" for Bool *)
 type tm = Var of int
         | App of tm * tm
         | Lam of tm
